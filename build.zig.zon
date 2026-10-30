@@ -1,0 +1,7 @@
+.{
+    .name = .lenz,
+    .version = "0.1.0",
+    .fingerprint = 0x55064067edb13bbe,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{ "build.zig", "build.zig.zon", "linker.ld.in", "src" },
+}

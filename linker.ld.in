@@ -1,0 +1,16 @@
+ENTRY(_start)
+SECTIONS {{
+    . = {s};
+    __kernel_start = .;
+    .text : {{
+        KEEP(*(.text.boot))
+        *(.text .text.*)
+    }}
+    .rodata : {{ *(.rodata .rodata.*) }}
+    .eh_frame_hdr : {{ *(.eh_frame_hdr) }}
+    .eh_frame : {{ KEEP(*(.eh_frame)) }}
+    .data : {{ *(.data .data.*) }}
+    .bss (NOLOAD) : {{ *(.bss .bss.*) *(COMMON) }}
+    __kernel_end = .;
+    /DISCARD/ : {{ *(.comment) *(.note*) }}
+}}
