@@ -5,6 +5,7 @@ SECTIONS {{
     .text : {{
         KEEP(*(.text.boot))
         *(.text .text.*)
+        KEEP(*(.text.vectors))
     }}
     .rodata : {{ *(.rodata .rodata.*) }}
     .eh_frame_hdr : {{ *(.eh_frame_hdr) }}

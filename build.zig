@@ -75,4 +75,7 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| qemu.addArgs(args);
     const run = b.step("run", "Booting with QEMU");
     run.dependOn(&qemu.step);
+
+    const check = b.step("check", "compile check");
+    check.dependOn(&kernel.step);
 }

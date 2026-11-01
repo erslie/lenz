@@ -28,3 +28,11 @@ pub fn ticksToNs(t: u64) u64 {
     const f = read("cntfrq_el0");
     return @intCast(@as(u128, t) * 1_000_000_000 / f);
 }
+
+pub inline fn wfi() void {
+    asm volatile ("wfi");
+}
+
+pub inline fn disableIrq() void {
+    asm volatile ("msr daifset, #2" ::: .{ .memory = true });
+}
