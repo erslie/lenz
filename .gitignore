@@ -4,3 +4,4 @@ zig-out/
 ghidra/
 *.gpr
 *.rep/
+*.log
