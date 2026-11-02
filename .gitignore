@@ -1,6 +1,8 @@
 .zed/
 .zig-cache/
 zig-out/
+zig-out-nosa/
 ghidra/
 *.gpr
 *.rep/
+*.log
