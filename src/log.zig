@@ -1,6 +1,7 @@
 const std = @import("std");
 const uart = @import("uart.zig");
 const cpu = @import("arch/cpu.zig");
+const trace = @import("trace.zig");
 
 pub fn logFn(
     comptime level: std.log.Level,
@@ -17,4 +18,5 @@ pub fn logFn(
     const us = cpu.ticksToNs(cpu.ticks()) / 1000;
     const prefix = comptime std.fmt.comptimePrint("{s}[{s}]\x1b[0m ({s})", .{ color, level.asText(), @tagName(scope) });
     uart.print("{d:>8}us " ++ prefix ++ format ++ "\n", .{us} ++ args);
+    trace.record(.log, @intFromEnum(level), 0, @tagName(scope) ++ ": " ++ format);
 }

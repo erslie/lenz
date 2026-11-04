@@ -1,6 +1,7 @@
 const std = @import("std");
 const cpu = @import("cpu.zig");
 const uart = @import("../uart.zig");
+const trace = @import("../trace.zig");
 const panic_mod = @import("../panic.zig");
 
 pub const TrapFrame = extern struct {
@@ -202,6 +203,9 @@ export fn exceptionHandler(f: *TrapFrame) callconv(.c) void {
 
 pub fn dumpFrame(f: *const TrapFrame) void {
     const ec = Ec.of(f.esr);
+
+    trace.record(.exception, f.elr, f.esr, ec.describe());
+
     uart.print(" Entrance: {s} from {s}  EC=0x{x:0>2} {s}\n", .{ kind_names[f.kind & 3], from_names[(f.kind >> 2) & 3], @intFromEnum(ec), ec.describe() });
     uart.print(" ESR=0x{x:0>8} ELR=0x{x:0>16} FAR=0x{x:0>16} SPSR=0x{x:0>8}\n", .{ f.esr, f.elr, f.far, f.spsr });
     switch (ec) {

@@ -23,6 +23,9 @@ SECTIONS {{
     __exc_stack_bottom = .;
     . += 0x4000;
     __exc_stack_top = .;
+    . = ALIGN(4096);
+    .lenzsyms : {{ KEEP(*(.lenzsyms)) }}
+    . = ALIGN(4096);
     __kernel_end = .;
     /DISCARD/ : {{ *(.comment) *(.note*) }}
 }}
