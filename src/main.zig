@@ -56,7 +56,7 @@ fn run(cmd: []const u8) void {
         uart.write(help_text);
     } else if (std.mem.eql(u8, cmd, "brk")) {
         asm volatile ("brk #1");
-        uart.write("Return from blk\n");
+        uart.write("Return from brk\n");
     } else if (std.mem.eql(u8, cmd, "udf")) {
         //udf: Instructions Designated as "Definitely Undefined" -> EC=0x00 (Unknown reason)
         asm volatile ("udf #0");

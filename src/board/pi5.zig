@@ -9,7 +9,7 @@ pub const uart_base: usize = 0x10_7d00_1000;
 //clock-frequency = <9216000>;
 //clock-output-names = "uart-clock";
 // };
-pub const uart_clock_hz: u32 = 9_216_000;
+pub const uart_clock_hz: u32 = 44_236_800;
 
 pub const ram_base: usize = 0x0;
 pub const ram_size: usize = 0x2800_0000;
