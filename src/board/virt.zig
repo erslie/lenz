@@ -5,3 +5,6 @@ pub const uart_base: usize = 0x0900_0000;
 //uart clock-frequency in https://gitlab.com/qemu-project/qemu/-/blob/master/hw/arm/virt.c
 //qemu_fdt_setprop_cell(fdt, "/apb-pclk", "clock-frequency", 24000000);
 pub const uart_clock_hz: u32 = 24_000_000;
+
+pub const ram_base: usize = 0x4000_0000;
+pub const ram_size: usize = 512 * 1024 * 1024;

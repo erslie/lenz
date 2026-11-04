@@ -33,6 +33,14 @@ pub inline fn wfi() void {
     asm volatile ("wfi");
 }
 
+pub inline fn enableIrq() void {
+    asm volatile ("msr daifclr, #2" ::: .{ .memory = true });
+}
+
 pub inline fn disableIrq() void {
     asm volatile ("msr daifset, #2" ::: .{ .memory = true });
+}
+
+pub inline fn irqEnabled() bool {
+    return read("daif") & (1 << 7) == 0;
 }

@@ -5,6 +5,8 @@ const exception = @import("arch/exception.zig");
 const uart = @import("uart.zig");
 const log = @import("log.zig");
 const panic_mod = @import("panic.zig");
+const symbols = @import("symbols.zig");
+const trace = @import("trace.zig");
 
 comptime {
     _ = @import("arch/boot.zig");
@@ -22,7 +24,7 @@ export fn kmain(dtb: usize) noreturn {
     uart.init(bps);
     uart.print("\nlenz: booting on {s} (EL{d}, dtb=0x{x})\n", .{ board.name, cpu.currentEl(), dtb });
     exception.init();
-    std.log.info("Exception Vector VBAR_EL1=0x{x}", .{cpu.read("vbar_el1")});
+    std.log.info("Exception Vector: VBAR_EL1=0x{x}, symbols count: {d}.", .{ cpu.read("vbar_el1"), symbols.count() });
     uart.write(help_text);
     while (true) {
         uart.write("lenz> ");
@@ -47,7 +49,7 @@ fn readLine(buf: []u8) []const u8 {
     }
 }
 
-const help_text = "Command: help / brk / udf / align / panic / overflow\n";
+const help_text = "Command: help / brk / udf / align / panic / overflow / bt / trace / deep\n";
 
 fn run(cmd: []const u8) void {
     if (std.mem.eql(u8, cmd, "help")) {
@@ -64,13 +66,27 @@ fn run(cmd: []const u8) void {
             :
             : [p] "r" (&buf[1]),
             : .{ .x0 = true, .memory = true });
+    } else if (std.mem.eql(u8, cmd, "panic")) {
+        @panic("Panic for command...");
     } else if (std.mem.eql(u8, cmd, "overflow")) {
         var x: u8 = 255;
         x += one();
         uart.print("x = {d}=\n", .{x});
+    } else if (std.mem.eql(u8, cmd, "bt")) {
+        panic_mod.backtrace(@frameAddress());
+    } else if (std.mem.eql(u8, cmd, "trace")) {
+        trace.dump(&uart.writer, 20);
+    } else if (std.mem.eql(u8, cmd, "deep")) {
+        deep(20);
     } else if (cmd.len > 0) {
         uart.print("Unknown Command: {s}\n", .{cmd});
     }
+}
+
+noinline fn deep(n: usize) void {
+    if (n == 0) @panic("I've hit rock bottom...");
+    deep(n - 1);
+    asm volatile ("" ::: .{ .memory = true });
 }
 
 noinline fn one() u8 {
