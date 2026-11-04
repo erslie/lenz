@@ -2,7 +2,11 @@
 .zig-cache/
 zig-out/
 zig-out-nosa/
+zig-out-pi5/
 ghidra/
 *.gpr
 *.rep/
 *.log
+
+tools/uart.py
+tools/__pycache__
