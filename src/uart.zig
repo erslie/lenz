@@ -9,6 +9,7 @@ const Reg = enum(usize) {
     fbrd = 0x28,
     lcrh = 0x2c,
     cr = 0x30,
+    imsc = 0x38,
     icr = 0x44,
 };
 const FR_TXFF = 1 << 5;
@@ -58,6 +59,16 @@ pub fn write(s: []const u8) void {
 pub fn getc() ?u8 {
     if (reg(.fr).* & FR_RXFE != 0) return null;
     return @truncate(reg(.dr).*);
+}
+
+//Enable Receive Interrupts: https://github.com/torvalds/linux/blob/v6.12/include/linux/amba/serial.h
+//Enable RTIM (Receive Timeout) as well, so that even a single character is sent successfully.
+pub fn enableRxIrq() void {
+    //RXIM | RITM
+    reg(.imsc).* = (1 << 4) | (1 << 6);
+}
+pub fn ackIrq() void {
+    reg(.icr).* = 0x7ff;
 }
 
 //If I let the data accumulate in the buffer,

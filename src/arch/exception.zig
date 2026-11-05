@@ -178,12 +178,21 @@ pub fn describeFsc(fsc: u6) []const u8 {
     };
 }
 
+pub var irq_handler: ?*const fn (*TrapFrame) void = null;
+
 //handler
 const kind_names = [4][]const u8{ "Sync", "IRQ", "FIQ", "SError" };
 const from_names = [4][]const u8{ "EL1/SP0", "EL1/SPx", "EL0/A64", "EL0/A32" };
 
 export fn exceptionHandler(f: *TrapFrame) callconv(.c) void {
     const kind = f.kind & 3;
+
+    //IRQ
+    if (kind == 1) {
+        if (irq_handler) |h| return h(f);
+        panic_mod.fatalFrame(f, "IRQ handler not registered");
+    }
+
     if (kind != 0) panic_mod.fatalFrame(f, kind_names[kind]);
 
     const ec = Ec.of(f.esr);
