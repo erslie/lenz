@@ -7,6 +7,9 @@ const log = @import("log.zig");
 const panic_mod = @import("panic.zig");
 const symbols = @import("symbols.zig");
 const trace = @import("trace.zig");
+const gic = @import("arch/gic.zig");
+const timer = @import("arch/timer.zig");
+const console = @import("console.zig");
 
 comptime {
     _ = @import("arch/boot.zig");
@@ -25,31 +28,20 @@ export fn kmain(dtb: usize) noreturn {
     uart.print("\nlenz: booting on {s} (EL{d}, dtb=0x{x})\n", .{ board.name, cpu.currentEl(), dtb });
     exception.init();
     std.log.info("Exception Vector: VBAR_EL1=0x{x}, symbols count: {d}.", .{ cpu.read("vbar_el1"), symbols.count() });
+    gic.init();
+    timer.init();
+    uart.enableRxIrq();
+    gic.enable(board.uart_irq, &console.onUartIrq);
+    cpu.enableIrq();
     uart.write(help_text);
     while (true) {
         uart.write("lenz> ");
         var buf: [64]u8 = undefined;
-        run(readLine(&buf));
+        run(console.readLine(&buf));
     }
 }
 
-fn readLine(buf: []u8) []const u8 {
-    var n: usize = 0;
-    while (true) {
-        const c = uart.getc() orelse continue;
-        if (c == '\r' or c == '\n') {
-            uart.write("\n");
-            return buf[0..n];
-        }
-        if (n < buf.len) {
-            buf[n] = c;
-            n += 1;
-            uart.putc(c);
-        }
-    }
-}
-
-const help_text = "Command: help / brk / udf / align / panic / overflow / bt / trace / deep\n";
+const help_text = "Command: help / brk / udf / align / panic / overflow / bt / trace / deep / irq / tick\n";
 
 fn run(cmd: []const u8) void {
     if (std.mem.eql(u8, cmd, "help")) {
@@ -78,6 +70,13 @@ fn run(cmd: []const u8) void {
         trace.dump(&uart.writer, 20);
     } else if (std.mem.eql(u8, cmd, "deep")) {
         deep(20);
+    } else if (std.mem.eql(u8, cmd, "irq")) {
+        for (gic.counts, 0..) |n, id| {
+            if (n != 0) uart.print(" INTID {d:>3}: {d} times{s}\n", .{ id, n, if (id == timer.intid) " (timer)" else if (id == board.uart_irq) " (UART)" else "" });
+        }
+    } else if (std.mem.eql(u8, cmd, "tick")) {
+        const ns = cpu.ticksToNs(cpu.ticks());
+        uart.print("{d} timer interrupts = {d}ms, counter = {d}ms\n", .{ timer.tick_count, timer.tick_count * 1000 / timer.hz, ns / 1_000_000 });
     } else if (cmd.len > 0) {
         uart.print("Unknown Command: {s}\n", .{cmd});
     }
