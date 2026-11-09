@@ -1,3 +1,5 @@
+//zig build -Dboard=pi5 -p zig-out-pi5
+
 pub const name = "raspberrypi-5";
 //3-Pin Debug UART (PL011) Between HDMI Ports
 pub const uart_base: usize = 0x10_7d00_1000;
@@ -19,3 +21,8 @@ pub const uart_irq: u32 = 32 + 121;
 
 pub const ram_base: usize = 0x0;
 pub const ram_size: usize = 0x2800_0000;
+
+//MMIO as a Device (0x7c00_0000 -> 0x10_7c00_0000, 64MiB)
+pub const mmio = [_]@import("region.zig").Region{
+    .{ .base = 0x10_7c00_0000, .size = 0x0400_0000 },
+};

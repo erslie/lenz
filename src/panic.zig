@@ -6,6 +6,7 @@ const trace = @import("trace.zig");
 const symbols = @import("symbols.zig");
 const exception = @import("arch/exception.zig");
 const qemu = @import("qemu.zig");
+const mmu = @import("arch/mmu.zig");
 
 var in_panic: bool = false;
 
@@ -48,7 +49,7 @@ pub fn backtrace(start_fp: usize) void {
 
     //Since the chain may be passed from the exception-specific stack to the kernel stack,
     //we do not assume that “addresses increase monotonically.” Instead, we stop at the depth limit.
-    while (depth < 4096 and validFp(fp)) : (depth += 1) {
+    while (depth < 4096 and validFp(fp) and mmu.probe(fp) != null) : (depth += 1) {
         const rec: *const [2]usize = @ptrFromInt(fp);
         const lr = rec[1];
         if (lr == 0) break;
@@ -107,7 +108,12 @@ pub fn fatalFrame(f: *exception.TrapFrame, why: []const u8) noreturn {
     }
     in_panic = true;
     uart.print("\n\x1b[41m FATAL EXCEPTION \x1b[0m {s}\n", .{why});
+    uart.write(" location: ");
+    symbols.print(&uart.writer, f.elr);
+    uart.write("\n");
     exception.dumpFrame(f);
+    backtrace(f.x[29]);
+    trace.dump(&uart.writer, 16);
     halt();
 }
 

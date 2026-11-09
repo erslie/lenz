@@ -7,9 +7,13 @@ SECTIONS {{
         *(.text .text.*)
         KEEP(*(.text.vectors))
     }}
+    . = ALIGN(4096);
+    __text_end = .;
     .rodata : {{ *(.rodata .rodata.*) }}
     .eh_frame_hdr : {{ *(.eh_frame_hdr) }}
     .eh_frame : {{ KEEP(*(.eh_frame)) }}
+    . = ALIGN(4096);
+    __rodata_end = .;
     .data : {{ *(.data .data.*) }}
     . = ALIGN(16);
     __bss_start = .;
@@ -17,9 +21,13 @@ SECTIONS {{
     . = ALIGN(16);
     __bss_end = .;
     . = ALIGN(4096);
+    __stack_guard = .;
+    . += 4096;
     __stack_bottom = .;
     . += 0x10000;
     __stack_top = .;
+    __exc_stack_guard = .;
+    . += 4096;
     __exc_stack_bottom = .;
     . += 0x4000;
     __exc_stack_top = .;
