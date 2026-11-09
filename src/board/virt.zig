@@ -17,3 +17,8 @@ pub const uart_irq: u32 = 33;
 
 pub const ram_base: usize = 0x4000_0000;
 pub const ram_size: usize = 512 * 1024 * 1024;
+
+//MMIO as a Device (32MiB including GIC 0x0800_0000-, UART 0x0900_0000)
+pub const mmio = [_]@import("region.zig").Region{
+    .{ .base = 0x0800_0000, .size = 0x0200_0000 },
+};

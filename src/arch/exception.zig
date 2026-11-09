@@ -3,6 +3,7 @@ const cpu = @import("cpu.zig");
 const uart = @import("../uart.zig");
 const trace = @import("../trace.zig");
 const panic_mod = @import("../panic.zig");
+const mmu = @import("mmu.zig");
 
 pub const TrapFrame = extern struct {
 
@@ -228,6 +229,9 @@ pub fn dumpFrame(f: *const TrapFrame) void {
                 describeFsc(fsc),
                 fsc,
             });
+            if (mmu.guardOwner(f.far)) |who|
+                uart.print("  * Hit the guard page of \"{s}\" = stack overflow (e.g. recursion too deep)\n", .{who});
+            if (f.far < 4096) uart.print("  * Address near 0 = likely a null pointer dereference\n", .{});
             //Only when FSC is 0x00..0x0f (size/conversion/access flags/permissions) do the lower 2 bits represent the number of rows in the table
             if (fsc <= 0x0f) uart.print("  (Occurs at page table level {d})\n", .{fsc & 3});
         },
