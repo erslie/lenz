@@ -93,6 +93,14 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| qemu.addArgs(args);
     const run = b.step("run", "booting on QEMU");
     run.dependOn(&qemu.step);
+
+    //zig build test
+    const tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("src/tests.zig"),
+        .target = b.graph.host,
+    }) });
+    const test_step = b.step("test", "unit test");
+    test_step.dependOn(&b.addRunArtifact(tests).step);
 }
 
 fn emptyFile(b: *std.Build, wf: *std.Build.Step.WriteFile) std.Build.LazyPath {
