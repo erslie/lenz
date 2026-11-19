@@ -11,6 +11,9 @@ const gic = @import("arch/gic.zig");
 const timer = @import("arch/timer.zig");
 const console = @import("console.zig");
 const mmu = @import("arch/mmu.zig");
+const kheap = @import("kheap.zig");
+
+const heap_size = 32 * 1024 * 1024;
 
 comptime {
     _ = @import("arch/boot.zig");
@@ -32,6 +35,10 @@ export fn kmain(dtb: usize) noreturn {
 
     mmu.init();
     std.log.info("MMU has enabled (SCTLR_EL1=0x{x})", .{cpu.read("sctlr_el1")});
+
+    kheap.init(mmu.freeRamStart(), heap_size);
+    std.log.info("heap: 0x{x} ~ {d}Mib", .{ mmu.freeRamStart(), heap_size >> 20 });
+
     gic.init();
     timer.init();
     uart.enableRxIrq();
@@ -46,7 +53,8 @@ export fn kmain(dtb: usize) noreturn {
 }
 
 const help_text = "Command: help / brk / udf / align / panic / overflow / bt / trace / deep / irq / tick\n" ++
-    "           pt <location|name> / crash <null|wtext|exec|guard>\n";
+    "           pt <location|name> / crash <null|wtext|exec|guard>\n" ++
+    "           heap / alloc <byte> / list / uaf / dfree\n";
 
 fn run(line: []const u8) void {
     var args = std.mem.tokenizeScalar(u8, line, ' ');
@@ -90,6 +98,29 @@ fn run(line: []const u8) void {
         uart.print("virtual address 0x{x}:\n", .{va});
         mmu.explain(&uart.writer, va);
         if (mmu.probe(va)) |pa| uart.print("CPU (AT S1E1R) answer : physical 0x{x}\n)", .{pa}) else uart.write("CPU (AT S1E1R) answer : Cannot convert\n");
+    } else if (std.mem.eql(u8, cmd, "heap")) {
+        var it = kheap.heap.iterate();
+        while (it.next()) |b| {
+            if (!b.used) continue;
+            uart.print("0x{x} {d:>7} byte location: ", .{ b.addr, b.req_len });
+            symbols.print(&uart.writer, b.ret_addr);
+            uart.write("\n");
+        }
+        const s = kheap.heap.stats();
+        uart.print("used {d} block {d} byte / empty {d} block {d} byte (max {d})\n", .{ s.used_blocks, s.used_bytes, s.free_blocks, s.free_bytes, s.largest_free });
+    } else if (std.mem.eql(u8, cmd, "alloc")) {
+        const n = parseNum(args.next()) orelse return uart.write("usage: alloc <byte>\n");
+        const buf = kheap.allocator().alloc(u8, n) catch return uart.write("Not enough\n");
+        uart.print("ensure: 0x{x} ({d} byte)\n", .{ @intFromPtr(buf.ptr), buf.len });
+    } else if (std.mem.eql(u8, cmd, "list")) {
+        listDemo();
+    } else if (std.mem.eql(u8, cmd, "uaf")) {
+        useAfterFree();
+    } else if (std.mem.eql(u8, cmd, "dfree")) {
+        const a = kheap.allocator();
+        const buf = a.alloc(u8, 100) catch return;
+        a.free(buf);
+        a.free(buf);
     } else if (std.mem.eql(u8, cmd, "crash")) {
         crash(args.next() orelse "");
     } else {
@@ -146,6 +177,35 @@ noinline fn recurse(n: u64) void {
 var sink: u64 = 0;
 // For crash exec: Instructions placed in the data area (readable and writable, but not executable)
 var code_in_data: [1]u32 align(4) = .{0xd65f03c0}; //ret
+
+fn listDemo() void {
+    const a = kheap.allocator();
+    var list: std.ArrayList(u32) = .empty;
+    defer list.deinit(a);
+    var last_cap: usize = 0;
+    for (0..100) |i| {
+        list.append(a, @intCast(i)) catch return uart.write("Not enough\n");
+        if (list.capacity != last_cap) {
+            uart.print("{d:>3}th item has a size of {d:>3} -> location: 0x{x}\n", .{ i + 1, list.capacity, @intFromPtr(list.items.ptr) });
+            last_cap = list.capacity;
+        }
+    }
+    var sum: u64 = 0;
+    for (list.items) |x| sum += x;
+    uart.print("total {d} (0~99)\n", .{sum});
+}
+
+const Point = struct { x: u64, y: u64 };
+
+fn useAfterFree() void {
+    const a = kheap.allocator();
+    const p = a.create(Point) catch return;
+    p.* = .{ .x = 1, .y = 2 };
+    uart.print("alloc: 0x{x} x={d} y={d}\n", .{ @intFromPtr(p), p.x, p.y });
+    a.destroy(p);
+    const q: *volatile Point = p;
+    uart.print("after free: x=0x{x} y=0x{x}\n", .{ q.x, q.y });
+}
 
 //
 // fn echoLoop() noreturn {
