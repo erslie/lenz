@@ -92,11 +92,17 @@ inline fn index(va: u64, level: u2) usize {
 }
 
 pub fn map(va_start: u64, pa_start: u64, size: u64, attr: Attr) void {
+    mapEx(va_start, pa_start, size, attr, .auto);
+}
+
+pub const Granule = enum { auto, pages };
+
+pub fn mapEx(va_start: u64, pa_start: u64, size: u64, attr: Attr, granule: Granule) void {
     var va = va_start;
     var pa = pa_start;
     const end = va_start + size;
     while (va < end) {
-        var level: u2 = 1;
+        var level: u2 = if (granule == .pages) 3 else 1;
         while (level < 3) : (level += 1) {
             const bs = @as(u64, 1) << shift(level);
             if (va % bs == 0 and pa % bs == 0 and end - va >= bs) break;
@@ -139,9 +145,46 @@ pub fn freeRamStart() u64 {
     return addr(&__kernel_end);
 }
 
+// Remove one page of a 4KB-mapped range from the map (attr = null) / put it back.
+// Also flush the TLB (cache of translations). Same steps as Linux __flush_tlb_kernel_pgtable.
+pub fn setPage(va: u64, attr: ?Attr) void {
+    var t = root;
+    var l: u2 = 1;
+    while (l < 3) : (l += 1) {
+        const e = t[index(va, l)];
+        if (!e.valid or e.kind != 1) std.debug.panic("0x{x} is not maped in 4KB units", .{va});
+        t = @ptrFromInt(e.phys());
+    }
+    t[index(va, 3)] = if (attr) |a| leaf(a, va, 3) else .{};
+    asm volatile (
+        \\dsb ishst
+        \\tlbi vaae1is, %[x]
+        \\dsb ish
+        \\isb
+        :
+        : [x] "r" ((va >> 12) & 0xfff_ffff_ffff),
+        : .{ .memory = true });
+}
+
+// Registry of guard pages: so the exception report can say "the guard of which stack"
+const Guard = struct { addr: u64, name: []const u8 };
+var guards: [32]Guard = undefined;
+var guard_count: usize = 0;
+
+pub fn addGuard(page: u64, name: []const u8) void {
+    setPage(page, null);
+    if (guard_count < guards.len) {
+        guards[guard_count] = .{ .addr = page, .name = name };
+        guard_count += 1;
+    }
+}
+
 pub fn guardOwner(far: u64) ?[]const u8 {
     if (far >= stackGuard() and far < stackGuard() + 4096) return "Stack at Startup";
     if (far >= addr(&__exc_stack_guard) and far < addr(&__exc_stack_guard) + 4096) return "Exception-Only Stack";
+    for (guards[0..guard_count]) |g| {
+        if (far >= g.addr and far < g.addr + 4096) return g.name;
+    }
     return null;
 }
 
@@ -149,7 +192,9 @@ pub fn stackGuard() u64 {
     return addr(&__stack_guard);
 }
 
-pub fn init() void {
+// heap_bytes: the part after the kernel that is mapped in 4KB units (= pages can be removed one by one).
+// Used for the heap.
+pub fn init(heap_bytes: u64) void {
     root = newTable();
     const ram_end = board.ram_base + board.ram_size;
     const ram_lo = if (board.ram_base == 0) 4096 else board.ram_base;
@@ -163,7 +208,11 @@ pub fn init() void {
     map(addr(&__stack_bottom), addr(&__stack_bottom), addr(&__stack_top) - addr(&__stack_bottom), .data);
     map(addr(&__exc_stack_bottom), addr(&__exc_stack_bottom), addr(&__exc_stack_top) - addr(&__exc_stack_bottom), .data);
     map(addr(&__exc_stack_top), addr(&__exc_stack_top), addr(&__kernel_end) - addr(&__exc_stack_top), .rodata);
-    map(addr(&__kernel_end), addr(&__kernel_end), ram_end - addr(&__kernel_end), .data);
+
+    // Map the heap in 4KB units, so a guard page (one page removed) can sit below each task stack.
+    mapEx(addr(&__kernel_end), addr(&__kernel_end), heap_bytes, .data, .pages);
+    const heap_end = addr(&__kernel_end) + heap_bytes;
+    map(heap_end, heap_end, ram_end - heap_end, .data);
 
     cpu.write("mair_el1", (MAIR_DEVICE_nGnRnE << (8 * IDX_DEVICE)) | (MAIR_NORMAL_WB << (8 * IDX_NORMAL)));
 

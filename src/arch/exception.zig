@@ -179,6 +179,7 @@ pub fn describeFsc(fsc: u6) []const u8 {
     };
 }
 
+pub var current_irq_frame: ?*TrapFrame = null;
 pub var irq_handler: ?*const fn (*TrapFrame) void = null;
 
 //handler
@@ -190,6 +191,8 @@ export fn exceptionHandler(f: *TrapFrame) callconv(.c) void {
 
     //IRQ
     if (kind == 1) {
+        current_irq_frame = f;
+        defer current_irq_frame = null;
         if (irq_handler) |h| return h(f);
         panic_mod.fatalFrame(f, "IRQ handler not registered");
     }
