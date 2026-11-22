@@ -11,6 +11,7 @@ const panic_mod = @import("panic.zig");
 const symbols = @import("symbols.zig");
 const kheap = @import("kheap.zig");
 const monitor = @import("monitor.zig");
+const sched = @import("sched.zig");
 
 comptime {
     _ = @import("arch/boot.zig");
@@ -32,7 +33,7 @@ export fn kmain(dtb: usize) noreturn {
     exception.init();
     std.log.info("Exception Vector: VBAR_EL1=0x{x}, symbols count: {d}.", .{ cpu.read("vbar_el1"), symbols.count() });
 
-    mmu.init();
+    mmu.init(heap_size);
     std.log.info("MMU has enabled (SCTLR_EL1=0x{x})", .{cpu.read("sctlr_el1")});
 
     kheap.init(mmu.freeRamStart(), heap_size);
@@ -43,9 +44,28 @@ export fn kmain(dtb: usize) noreturn {
     uart.enableRxIrq();
     gic.enable(board.uart_irq, &monitor.onUartIrq);
     cpu.enableIrq();
+    std.log.info("interrupts started: tiemr {d}Hz (cntfrq={d})", .{ timer.hz, cpu.read("cntfrq_el0") });
+
+    sched.init(kheap.allocator());
+    _ = sched.spawn("count1s", countTask, 1000, 16 * 1024) catch unreachable;
+    _ = sched.spawn("count2s", countTask, 2000, 16 * 1024) catch unreachable;
+    _ = sched.spawn("monitor", monitorTask, 0, 32 * 1024) catch unreachable;
+
+    while (true) sched.sleepMs(60_000);
+}
+
+fn countTask(interval_ms: usize) void {
+    const t0 = cpu.ticks();
+    for (0..4) |i| {
+        std.log.info("[{s}] #{d} elapsed {d}ms", .{ sched.currentTask().name, i, cpu.ticksToNs(cpu.ticks() - t0) / 1_000_000 });
+        sched.sleepMs(interval_ms);
+    }
+}
+
+fn monitorTask(_: usize) void {
     monitor.prompt();
     while (true) {
         monitor.poll();
-        cpu.wfi();
+        sched.sleepMs(10);
     }
 }

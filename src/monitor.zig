@@ -9,6 +9,7 @@ const trace = @import("trace.zig");
 const symbols = @import("symbols.zig");
 const panic_mod = @import("panic.zig");
 const kheap = @import("kheap.zig");
+const sched = @import("sched.zig");
 
 // rx buffer
 var rx: [256]u8 = undefined;
@@ -72,10 +73,12 @@ const commands = [_]Command{
     .{ .name = "trace", .help = "trace [count] record of recent events", .run = cmdTrace },
     .{ .name = "irq", .help = "interrupt counts", .run = cmdIrq },
     .{ .name = "heap", .help = "heap usage and allocated blocks (who allocated them)", .run = cmdHeap },
+    .{ .name = "tasks", .help = "list of tasks (state, switches, max stack used)", .run = cmdTasks },
     .{ .name = "bt", .help = "current backtrace", .run = cmdBt },
     .{ .name = "brk", .help = "stop at a BRK instruction, show registers, then resume", .run = cmdBrk },
     .{ .name = "uaf", .help = "try reading freed memory (use-after-free) and see what shows up", .run = cmdUaf },
     .{ .name = "dfree", .help = "free the same memory twice (test double-free detection)", .run = cmdDoubleFree },
+    .{ .name = "hog", .help = "hog the CPU for 1.5 s without yielding (watchdog check)", .run = cmdHog },
     .{ .name = "crash", .help = "crash <null|wtext|exec|guard|panic|overflow> crash on purpose to check the report", .run = cmdCrash },
 };
 
@@ -192,6 +195,16 @@ fn cmdDoubleFree(_: *std.mem.TokenIterator(u8, .scalar)) void {
     a.free(buf);
     // Second time: the heap should notice and stop
     a.free(buf);
+}
+
+fn cmdTasks(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    sched.dump(&uart.writer);
+}
+
+fn cmdHog(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    const end = cpu.ticks() + cpu.read("cntfrq_el0") * 3 / 2;
+    while (cpu.ticks() < end) {}
+    uart.write("hog: done\n");
 }
 
 fn cmdBt(_: *std.mem.TokenIterator(u8, .scalar)) void {

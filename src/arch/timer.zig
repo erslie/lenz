@@ -10,6 +10,7 @@ pub const hz = 100;
 pub var tick_count: u64 = 0;
 var interval: u64 = 0;
 var next: u64 = 0;
+pub var on_tick: ?*const fn () void = null;
 
 pub fn init() void {
     interval = cpu.read("cntfrq_el0") / hz;
@@ -30,4 +31,6 @@ fn handle(_: u32) void {
 
     //If you reschedule, the conditions for skipping your turn this time will also be cleared.
     cpu.write("cntp_cval_el0", next);
+
+    if (on_tick) |f| f();
 }
