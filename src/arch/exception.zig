@@ -181,6 +181,8 @@ pub fn describeFsc(fsc: u6) []const u8 {
 
 pub var current_irq_frame: ?*TrapFrame = null;
 pub var irq_handler: ?*const fn (*TrapFrame) void = null;
+// For modules that want to intercept some synchronous exceptions (watchpoints etc.). Return true if handled.
+pub var debug_hook: ?*const fn (*TrapFrame, Ec) bool = null;
 
 //handler
 const kind_names = [4][]const u8{ "Sync", "IRQ", "FIQ", "SError" };
@@ -200,6 +202,9 @@ export fn exceptionHandler(f: *TrapFrame) callconv(.c) void {
     if (kind != 0) panic_mod.fatalFrame(f, kind_names[kind]);
 
     const ec = Ec.of(f.esr);
+    trace.record(.exception, f.elr, f.esr, ec.describe());
+    if (debug_hook) |h| if (h(f, ec)) return;
+
     switch (ec) {
         .brk64 => {
             const imm: u16 = @truncate(f.esr);
@@ -216,8 +221,6 @@ export fn exceptionHandler(f: *TrapFrame) callconv(.c) void {
 
 pub fn dumpFrame(f: *const TrapFrame) void {
     const ec = Ec.of(f.esr);
-
-    trace.record(.exception, f.elr, f.esr, ec.describe());
 
     uart.print(" Entrance: {s} from {s}  EC=0x{x:0>2} {s}\n", .{ kind_names[f.kind & 3], from_names[(f.kind >> 2) & 3], @intFromEnum(ec), ec.describe() });
     uart.print(" ESR=0x{x:0>8} ELR=0x{x:0>16} FAR=0x{x:0>16} SPSR=0x{x:0>8}\n", .{ f.esr, f.elr, f.far, f.spsr });

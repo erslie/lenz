@@ -155,7 +155,14 @@ pub fn yield() void {
         }
         break;
     }
-    if (next == prev) return;
+
+    if (next == prev) {
+        const c = currentTask();
+        c.last_run_tick = timer.tick_count;
+        c.watchdog_reported = false;
+        return;
+    }
+
     checkCanary(&tasks[prev]);
     tasks[next].switches += 1;
     tasks[next].last_run_tick = timer.tick_count;

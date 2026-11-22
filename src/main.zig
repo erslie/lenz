@@ -12,6 +12,9 @@ const symbols = @import("symbols.zig");
 const kheap = @import("kheap.zig");
 const monitor = @import("monitor.zig");
 const sched = @import("sched.zig");
+const debug = @import("arch/debug.zig");
+
+pub export var demo_counter: u64 = 0;
 
 comptime {
     _ = @import("arch/boot.zig");
@@ -46,6 +49,7 @@ export fn kmain(dtb: usize) noreturn {
     cpu.enableIrq();
     std.log.info("interrupts started: tiemr {d}Hz (cntfrq={d})", .{ timer.hz, cpu.read("cntfrq_el0") });
 
+    debug.init();
     sched.init(kheap.allocator());
     _ = sched.spawn("count1s", countTask, 1000, 16 * 1024) catch unreachable;
     _ = sched.spawn("count2s", countTask, 2000, 16 * 1024) catch unreachable;
@@ -57,9 +61,14 @@ export fn kmain(dtb: usize) noreturn {
 fn countTask(interval_ms: usize) void {
     const t0 = cpu.ticks();
     for (0..4) |i| {
+        bump();
         std.log.info("[{s}] #{d} elapsed {d}ms", .{ sched.currentTask().name, i, cpu.ticksToNs(cpu.ticks() - t0) / 1_000_000 });
         sched.sleepMs(interval_ms);
     }
+}
+
+noinline fn bump() void {
+    demo_counter += 1;
 }
 
 fn monitorTask(_: usize) void {

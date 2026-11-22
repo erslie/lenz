@@ -10,6 +10,7 @@ const symbols = @import("symbols.zig");
 const panic_mod = @import("panic.zig");
 const kheap = @import("kheap.zig");
 const sched = @import("sched.zig");
+const debug = @import("arch/debug.zig");
 
 // rx buffer
 var rx: [256]u8 = undefined;
@@ -76,6 +77,11 @@ const commands = [_]Command{
     .{ .name = "tasks", .help = "list of tasks (state, switches, max stack used)", .run = cmdTasks },
     .{ .name = "bt", .help = "current backtrace", .run = cmdBt },
     .{ .name = "brk", .help = "stop at a BRK instruction, show registers, then resume", .run = cmdBrk },
+    .{ .name = "watch", .help = "watch <address|var> [w|r|rw] report the culprit the moment it writes/reads (CPU watchpoint)", .run = cmdWatch },
+    .{ .name = "unwatch", .help = "remove the watchpoint", .run = cmdUnwatch },
+    .{ .name = "hbreak", .help = "hbreak <address|function> stop right before that instruction and report (CPU breakpoint)", .run = cmdHbreak },
+    .{ .name = "unbreak", .help = "remove the breakpoint", .run = cmdUnbreak },
+    .{ .name = "dbg", .help = "debug feature state", .run = cmdDbg },
     .{ .name = "uaf", .help = "try reading freed memory (use-after-free) and see what shows up", .run = cmdUaf },
     .{ .name = "dfree", .help = "free the same memory twice (test double-free detection)", .run = cmdDoubleFree },
     .{ .name = "hog", .help = "hog the CPU for 1.5 s without yielding (watchdog check)", .run = cmdHog },
@@ -116,14 +122,15 @@ fn cmdDump(args: *std.mem.TokenIterator(u8, .scalar)) void {
     const start = parseAddr(args.next()) orelse return uart.write("usage: x <addr> [bytes]\n");
     const len = @min(parseNum(args.next()) orelse 64, 4096);
     var a = start & ~@as(u64, 15);
-    while (a < start + len) : (a += 16) {
+    const end = start +| len;
+    while (a < end) : (a +|= 16) {
         if (mmu.probe(a) == null) {
             uart.print("0x{x:0>16}: (address not in the map. Reading it would fault, so not reading)\n", .{a});
             return;
         }
         const p: [*]const volatile u8 = @ptrFromInt(a);
         uart.print("0x{x:0>16}: ", .{a});
-        for (0..16) |i| uart.print("{x:0>2}{s}", .{ p[i], if (i == 7) " " else " " });
+        for (0..16) |i| uart.print("{x:0>2}{s}", .{ p[i], if (i == 7) "  " else " " });
         uart.write(" |");
         for (0..16) |i| {
             const c = p[i];
@@ -175,6 +182,35 @@ fn cmdHeap(_: *std.mem.TokenIterator(u8, .scalar)) void {
         shown += 1;
     }
     cmdInfo(undefined);
+}
+
+fn cmdWatch(args: *std.mem.TokenIterator(u8, .scalar)) void {
+    const a = parseAddr(args.next()) orelse return uart.write("usage: watch <address|var> [w|r|rw]\n");
+    if (mmu.probe(a) == null) return uart.write("address not in the map, so it cannot be watched\n");
+    const k = args.next() orelse "w";
+    const kind: debug.Kind = if (std.mem.eql(u8, k, "r")) .load else if (std.mem.eql(u8, k, "rw")) .both else .store;
+    debug.watch(a, kind);
+    uart.print("watching 0x{x} ({s})\n", .{ a & ~@as(u64, 7), @tagName(kind) });
+}
+
+fn cmdUnwatch(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    debug.unwatch();
+}
+
+fn cmdHbreak(args: *std.mem.TokenIterator(u8, .scalar)) void {
+    const a = parseAddr(args.next()) orelse return uart.write("usage: hbreak <address|function>\n");
+    debug.hbreak(a);
+    uart.write("breakpoint: ");
+    symbols.print(&uart.writer, a);
+    uart.write("\n");
+}
+
+fn cmdUnbreak(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    debug.unbreak();
+}
+
+fn cmdDbg(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    debug.status(&uart.writer);
 }
 
 const Point = struct { x: u64, y: u64 };
