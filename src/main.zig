@@ -13,6 +13,7 @@ const kheap = @import("kheap.zig");
 const monitor = @import("monitor.zig");
 const sched = @import("sched.zig");
 const debug = @import("arch/debug.zig");
+const pci = @import("pci.zig");
 
 pub export var demo_counter: u64 = 0;
 
@@ -41,6 +42,11 @@ export fn kmain(dtb: usize) noreturn {
 
     kheap.init(mmu.freeRamStart(), heap_size);
     std.log.info("heap: 0x{x} ~ {d}Mib", .{ mmu.freeRamStart(), heap_size >> 20 });
+
+    if (board.pci != null) {
+        pci.scan();
+        std.log.info("PCI: {d} devices", .{pci.count});
+    }
 
     gic.init();
     timer.init();

@@ -11,6 +11,7 @@ const panic_mod = @import("panic.zig");
 const kheap = @import("kheap.zig");
 const sched = @import("sched.zig");
 const debug = @import("arch/debug.zig");
+const pci = @import("pci.zig");
 
 // rx buffer
 var rx: [256]u8 = undefined;
@@ -72,6 +73,7 @@ const commands = [_]Command{
     .{ .name = "pt", .help = "pt <address> how the page table is walked, and the CPU's translation result", .run = cmdPt },
     .{ .name = "sym", .help = "sym <address|function> address <-> function", .run = cmdSym },
     .{ .name = "trace", .help = "trace [count] record of recent events", .run = cmdTrace },
+    .{ .name = "lspci", .help = "list of PCI devices and assigned BARs", .run = cmdLspci },
     .{ .name = "irq", .help = "interrupt counts", .run = cmdIrq },
     .{ .name = "heap", .help = "heap usage and allocated blocks (who allocated them)", .run = cmdHeap },
     .{ .name = "tasks", .help = "list of tasks (state, switches, max stack used)", .run = cmdTasks },
@@ -159,6 +161,11 @@ fn cmdSym(args: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdTrace(args: *std.mem.TokenIterator(u8, .scalar)) void {
     trace.dump(&uart.writer, parseNum(args.next()) orelse 20);
+}
+
+fn cmdLspci(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    if (board.pci == null) return uart.write("this board does not handle PCI\n");
+    pci.dump(&uart.writer);
 }
 
 fn cmdIrq(_: *std.mem.TokenIterator(u8, .scalar)) void {
