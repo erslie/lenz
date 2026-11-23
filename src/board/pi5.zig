@@ -26,3 +26,6 @@ pub const ram_size: usize = 0x2800_0000;
 pub const mmio = [_]@import("region.zig").Region{
     .{ .base = 0x10_7c00_0000, .size = 0x0400_0000 },
 };
+
+// The pi5's PCIe (where RP1 etc. hang) isn't ECAM but a different design, so this book doesn't cover it
+pub const pci: ?@import("region.zig").Pci = null;

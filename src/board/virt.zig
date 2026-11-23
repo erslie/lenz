@@ -21,4 +21,14 @@ pub const ram_size: usize = 512 * 1024 * 1024;
 //MMIO as a Device (32MiB including GIC 0x0800_0000-, UART 0x0900_0000)
 pub const mmio = [_]@import("region.zig").Region{
     .{ .base = 0x0800_0000, .size = 0x0200_0000 },
+    .{ .base = 0x1000_0000, .size = 0x2eff_0000 },
+    .{ .base = 0x3f00_0000, .size = 0x0100_0000 },
+};
+
+//offset: https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/pci_regs.h
+pub const pci: ?@import("region.zig").Pci = .{
+    .ecam_base = 0x3f00_0000,
+    .ecam_size = 0x0100_0000, // 1MB per bus x 16 buses
+    .mmio_base = 0x1000_0000,
+    .mmio_size = 0x2eff_0000,
 };

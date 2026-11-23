@@ -78,7 +78,7 @@ pub fn build(b: *std.Build) void {
     const qemu = b.addSystemCommand(&.{
         "qemu-system-aarch64",
         "-M",
-        "virt,gic-version=2,virtualization=on",
+        "virt,gic-version=2,virtualization=on,highmem-ecam=off",
         "-cpu",
         "cortex-a72",
         "-m",
@@ -86,6 +86,16 @@ pub fn build(b: *std.Build) void {
         "-nographic",
         "-semihosting-config",
         "enable=on,target=native",
+        "-device",
+        "bochs-display",
+        "-netdev",
+        "user,id=n0",
+        "-device",
+        "virtio-net-pci,netdev=n0",
+        "-device",
+        "qemu-xhci",
+        "-device",
+        "usb-kbd",
         "-kernel",
     });
     qemu.addArtifactArg(kernel);
