@@ -14,6 +14,8 @@ const monitor = @import("monitor.zig");
 const sched = @import("sched.zig");
 const debug = @import("arch/debug.zig");
 const pci = @import("pci.zig");
+const display = @import("display.zig");
+const screen = @import("screen.zig");
 
 pub export var demo_counter: u64 = 0;
 
@@ -60,6 +62,9 @@ export fn kmain(dtb: usize) noreturn {
     _ = sched.spawn("count1s", countTask, 1000, 16 * 1024) catch unreachable;
     _ = sched.spawn("count2s", countTask, 2000, 16 * 1024) catch unreachable;
     _ = sched.spawn("monitor", monitorTask, 0, 32 * 1024) catch unreachable;
+    if (board.pci != null and display.init()) {
+        _ = sched.spawn("screen", screen.task, 0, 16 * 1024) catch unreachable;
+    }
 
     while (true) sched.sleepMs(60_000);
 }
