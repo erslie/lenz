@@ -204,6 +204,16 @@ fn unusedStack(t: *const Task) usize {
     return n - 8;
 }
 
+// List of created tasks (used by the screen panel)
+pub fn list() []const Task {
+    return tasks[0..count];
+}
+
+// Peak stack usage (bytes)
+pub fn stackUsed(t: *const Task) usize {
+    return t.stack.len - 8 - unusedStack(t);
+}
+
 pub fn dump(w: *std.Io.Writer) void {
     w.print("   ID name         state       switch     max stack used\n", .{}) catch {};
     for (tasks[0..count], 0..) |*t, i| {
